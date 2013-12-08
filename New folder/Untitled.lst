@@ -1,0 +1,1272 @@
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001            title     "assignment_3"
+                      00002            list      p=16f877a
+                      00003            include   "p16f877a.inc"
+                      00001         LIST
+                      00002 ; P16F877A.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+                      00400         LIST
+                      00004 
+2007   3F32           00005         __CONFIG _CP_OFF & _WDT_OFF & _BODEN_OFF & _PWRTE_ON & _HS_OSC & _WRT_OFF & _LVP_OFF & _CPD_OFF
+                      00006 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00007 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00008 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00009 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00010 ;;;;;;;;;;DEFINITION OF THE REGISTERS AND VARIABLES;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  00000021            00011 del1            equ     h'21'
+  00000022            00012 del2            equ     h'22'
+  00000023            00013 del3            equ             h'23'
+  00000024            00014 del4            equ             h'24'
+  00000025            00015 data_hi         equ             h'25'
+  00000026            00016 data_lo         equ             h'26'
+  00000027            00017 key_input       equ             h'27'
+  00000028            00018 display1        equ             h'28'
+  00000029            00019 display0        equ             h'29'
+  0000002A            00020 count_flag      equ             h'2A'
+  0000002B            00021 key                     equ             h'2B'
+  0000002C            00022 reg                     equ             h'2C'
+  0000002D            00023 way                     equ             h'2D'
+  0000002F            00024 max                     equ             h'2F'
+  00000030            00025 start_stop      equ             h'30'
+  00000031            00026 W_save          equ             h'31'
+  00000032            00027 S_save          equ             h'32'
+  00000033            00028 _stop           equ             h'33'
+                      00029 
+  00000030            00030 number          equ             d'48'
+                      00031 
+                      00032 
+                      00033 
+                      00034 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00035 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00036 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00037 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00038 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;START ADDRESS, INTERRUPT ADDRESS AND TINY BOOTLOADER SETTINGS;;;;;;;;;;;;;;
+                      00039                 org     h'00'                   ; initialise system restart vector
+0000   0183           00040                 clrf    STATUS
+0001   018A           00041                 clrf    PCLATH                  ; needed for TinyBootloader functionality
+0002   2???           00042                 goto    start
+                      00043 
+                      00044                 org             H'0004' ;address of the interrupt function
+0004   2???           00045                 goto    int_routine
+                      00046 
+                      00047 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00048 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00049 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00050 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  2
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00051 ;;;;;;;;;;;;;;;;;;;;;;;REGISTER, INPUTS/OUTPUTS AND VARIABLE INITIALISATION;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00052 
+0005                  00053 init
+0005   1683           00054                 bsf             STATUS,RP0
+                      00055 
+0006   30FF           00056                 movlw   B'11111111'     ;B set as inputs (4needed)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0007   0086           00057                 movwf   TRISB
+                      00058 
+0008   3000           00059                 movlw   B'00000000'     ;C set as outputs (2 needed)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0009   0087           00060                 movwf   TRISC
+                      00061 
+000A   1283           00062                 bcf             STATUS,RP0
+000B   1007           00063                 bcf             PORTC,0 ;alarm + morse code
+000C   1107           00064                 bcf             PORTC,2 ;to see the way
+                      00065 
+000D   3000           00066                 movlw   b'00000000'     ;for the count way
+000E   00AD           00067                 movwf   way
+                      00068 
+000F   3000           00069                 movlw   b'00000000'     ;flag for the stop function
+0010   00B3           00070                 movwf   _stop
+                      00071 
+0011   3000           00072                 movlw   b'00000000'     ;flag to start the start/stop function
+0012   00B0           00073                 movwf   start_stop
+                      00074 
+0013   3000           00075                 movlw   b'00000000'     ;usefull to count in the other way
+0014   00AF           00076                 movwf   max
+                      00077 
+0015   30C0           00078                 movlw   B'11000000'     ;pull up disabled, interrupt on ridsing edge
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0016   0081           00079                 movwf   OPTION_REG
+                      00080 
+0017   178B           00081                 bsf             INTCON,GIE      ;registers for the interrupt
+0018   170B           00082                 bsf             INTCON,PEIE
+0019   160B           00083                 bsf             INTCON,INTE
+001A   108B           00084                 bcf             INTCON,INTF
+001B   110B           00085                 bcf             INTCON,TMR0IF
+                      00086 
+001C   2???           00087                 call    INIT_SWITCH
+                      00088 
+001D   2???           00089                 call    INIT_LCD
+                      00090 
+001E   0008           00091                 return  ;go back to the main function
+                      00092 
+                      00093 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00094 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00095 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00096 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00097 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;INTERRUPT FUNCTION (START/STOP BUTTON);;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00098 
+001F                  00099 int_routine
+001F   138B           00100                 bcf             INTCON,GIE      ;clear all flags
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  3
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0020   130B           00101                 bcf             INTCON,PEIE
+0021   120B           00102                 bcf             INTCON,INTE
+                      00103         
+0022   00B1           00104                 movwf   W_save ; save W register
+0023   0E03           00105                 swapf   STATUS,w ; move without status change
+0024   00B2           00106                 movwf   S_save ; save status
+                      00107 
+0025   1430           00108                 bsf             start_stop,0    ;flag for the stop/start function
+                      00109                 
+0026   1833           00110                 btfsc   _stop,0 ;flag for the stop function
+0027   2???           00111                 call    stop
+                      00112 
+                      00113 
+0028   0E32           00114                 swapf   S_save,w ;
+0029   0083           00115                 movwf   STATUS ; restore status
+002A   0EB1           00116                 swapf   W_save,f ; MUST NOT CHANGE STATUS
+002B   0E31           00117                 swapf   W_save,w
+                      00118                 
+002C   178B           00119                 bsf             INTCON,GIE      ;set all flags
+002D   170B           00120                 bsf             INTCON,PEIE
+002E   160B           00121                 bsf             INTCON,INTE
+002F   108B           00122                 bcf             INTCON,INTF
+0030   110B           00123                 bcf             INTCON,TMR0IF
+                      00124 
+0031   0009           00125                 retfie
+                      00126 
+0032                  00127 go              
+0032   1C2D           00128                 btfss   way,0   ;the way is checked
+0033   2???           00129                 goto    go1_1   ;straight way
+0034   2???           00130                 goto    go2     ;reverse way
+0035   0008           00131                 return
+                      00132 
+0036                  00133 go2
+0036   0827           00134                 movfw   key_input
+0037   00AF           00135                 movwf   max     ;the key_input is copied in max register
+0038   01A7           00136                 clrf    key_input
+                      00137 
+Message[305]: Using default destination of 1 (file).
+0039   0AAF           00138 go2_1   incf    max     ;Here we check if max is 0
+Message[305]: Using default destination of 1 (file).
+003A   0BAF           00139                 decfsz  max
+003B   2???           00140                 goto    go2_2
+003C   2???           00141                 call    alarm   ;the number is reached, so the alarm is called
+003D   0008           00142                 return
+                      00143 
+003E   2???           00144 go2_2   call    test_key        ;display of the count ont he 7 segment
+003F   1433           00145                 bsf             _stop,0 ;the flag of the stop function is set
+0040   2???           00146                 call    wait1430ms
+Message[305]: Using default destination of 1 (file).
+0041   0AA7           00147                 incf    key_input       ;the number which is display is incremented
+Message[305]: Using default destination of 1 (file).
+0042   03AF           00148                 decf    max     ;max is decremented
+0043   2???           00149                 goto    go2_1   ;come back to the previous function
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  4
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00150 
+Message[305]: Using default destination of 1 (file).
+0044   0AA7           00151 go1_1   incf    key_input       ;We check if the number is reached
+Message[305]: Using default destination of 1 (file).
+0045   0BA7           00152                 decfsz  key_input
+0046   2???           00153                 goto    go1_2
+0047   2???           00154                 call    alarm   ;once the count is over, the alarm is called
+0048   0008           00155                 return
+                      00156 
+0049   2???           00157 go1_2   call    test_key        ;display of the count
+004A   1433           00158                 bsf             _stop,0 ;flag of the stop function set
+004B   2???           00159                 call    wait1430ms
+Message[305]: Using default destination of 1 (file).
+004C   03A7           00160                 decf    key_input
+004D   2???           00161                 goto    go1_1
+                      00162 
+004E   2???           00163 stop    call    morse   ;morse code called
+004F   1886           00164 stop2   btfsc   PORTB,1 ;RESET
+0050   2???           00165                 goto    start
+0051   1C06           00166                 btfss   PORTB,0
+0052   2???           00167                 goto    stop2
+0053   1033           00168                 bcf             _stop,0 ;flag is cleared
+0054   0008           00169                 return
+                      00170 
+                      00171 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00172 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00173 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00174 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00175 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;ALARM;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+0055                  00176 delay500us
+                      00177                 
+0055   302A           00178                 movlw   d'42'
+0056   00A1           00179                 movwf   del1
+0057                  00180 delay1
+Message[305]: Using default destination of 1 (file).
+0057   0BA1           00181                 decfsz  del1
+0058   2???           00182                 goto    delay1
+                      00183 
+0059   0008           00184         return
+                      00185 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            ;;
+                      00186 
+005A                  00187 alarm
+                      00188 
+005A   2???           00189                 call    test_key
+005B   303B           00190                 movlw   d'59'
+005C   00A2           00191                 movwf   del2
+005D   30FF           00192                 movlw   d'255'
+005E   00A3           00193                 movwf   del3
+                      00194 
+005F                  00195 delay2
+005F   1407           00196                 bsf             PORTC,0 ;a square function is needed for the speaker
+0060   2???           00197                 call    delay500us      ;High frequency
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  5
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0061   1007           00198                 bcf             PORTC,0
+0062   2???           00199                 call    delay500us
+0063   1407           00200                 bsf             PORTC,0
+                      00201 
+Message[305]: Using default destination of 1 (file).
+0064   0BA3           00202                 decfsz  del3
+0065   2???           00203                 goto    delay2
+Message[305]: Using default destination of 1 (file).
+0066   0BA2           00204                 decfsz  del2
+0067   2???           00205                 goto    delay2
+                      00206 
+0068   2???           00207                 goto    start   ;once the alarm is over, we start the program from the beginning
+0069   0008           00208                 return
+                      00209 
+                      00210 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00211 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00212 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00213 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00214 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MORSE CODE;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+006A                  00215 delay500us2
+                      00216                 
+006A   302A           00217                 movlw   d'42'
+006B   00A1           00218                 movwf   del1
+006C                  00219 delay1_2
+Message[305]: Using default destination of 1 (file).
+006C   0BA1           00220                 decfsz  del1
+006D   2???           00221                 goto    delay1_2
+                      00222 
+006E   0008           00223         return
+                      00224 
+006F                  00225 morse
+006F   0828           00226                 movfw   display1
+0070   00AC           00227                 movwf   reg     ;reg take the value of the first number
+                      00228 
+0071   2???           00229                 call    _reg    ;call the binary tree which will find which signal have to be transmitte
+                            d for the first number
+                      00230 
+0072   0829           00231                 movfw   display0
+0073   00AC           00232                 movwf   reg
+                      00233         
+0074   2???           00234                 call    _reg    ;reg take the value of the second number
+                      00235 
+0075   0008           00236                 return
+                      00237 
+0076                  00238 short_wait      ;Short way between 2 signals
+                      00239                 
+0076   30C8           00240                 movlw   d'200'
+0077   00A3           00241                 movwf   del3
+0078                  00242 mcs2
+0078   0000           00243                 nop
+0079   2???           00244                 call    delay500us2
+007A   0000           00245                 nop
+007B   2???           00246                 call    delay500us2
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  6
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00247 
+Message[305]: Using default destination of 1 (file).
+007C   0BA3           00248                 decfsz  del3
+007D   2???           00249                 goto    mcs2
+                      00250 
+007E   0008           00251                 return
+                      00252 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            ;;
+                      00253                 
+007F                  00254 long_wait       ;Long wait between two numbers
+                      00255                 
+007F   300A           00256                 movlw   d'10'
+0080   00A4           00257                 movwf   del4
+0081                  00258 mcl2
+0081   2???           00259                 call    short_wait
+Message[305]: Using default destination of 1 (file).
+0082   0BA4           00260                 decfsz  del4
+0083   2???           00261                 goto    mcl2
+                      00262 
+0084   0008           00263                 return
+                      00264 
+0085                  00265 _reg
+0085   192C           00266                 btfsc   reg,2   ;if 1xx
+0086   2???           00267                 goto    t0              ;go to t0 function
+                      00268 
+0087   2???           00269                 goto    t1
+                      00270 
+0088                  00271 t0
+0088   18AC           00272                 btfsc   reg,1   ;if 11x
+0089   2???           00273                 goto    _6              ;goto _6 (max number we can have)
+                      00274 
+008A   2???           00275                 goto    t3
+                      00276 
+008B                  00277 t1
+008B   18AC           00278                 btfsc   reg,1   ;if 01x
+008C   2???           00279                 goto    t4              ;go to t4
+                      00280 
+008D   2???           00281                 goto    t5
+                      00282 
+008E                  00283 t3
+008E   182C           00284                 btfsc   reg,0   ;if 101
+008F   2???           00285                 goto    _5              ;the number is 5
+                      00286 
+0090   2???           00287                 goto    _4              ;else the number is 4
+                      00288 
+0091                  00289 t4
+0091   182C           00290                 btfsc   reg,0   ;if 011
+0092   2???           00291                 goto    _3              ;the number is 3
+                      00292 
+0093   2???           00293                 goto    _2              ;else the number is 2
+                      00294 
+0094                  00295 t5
+0094   182C           00296                 btfsc   reg,0   ;if 001
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  7
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0095   2???           00297                 goto    _1              ;the number is 1
+                      00298 
+0096   2???           00299                 goto    _0              ;else the number is 0
+                      00300 
+0097   0008           00301                 return
+                      00302 
+0098                  00303 _0
+0098   2???           00304                 call    long    ;morse code for 0
+0099   2???           00305                 call    short_wait
+009A   2???           00306                 call    long
+009B   2???           00307                 call    short_wait
+009C   2???           00308                 call    long
+009D   2???           00309                 call    short_wait
+009E   2???           00310                 call    long
+009F   2???           00311                 call    short_wait
+00A0   2???           00312                 call    long
+00A1   2???           00313                 call    long_wait
+                      00314         
+00A2   0008           00315                 return
+                      00316 
+00A3                  00317 _1
+00A3   2???           00318                 call    short   ;morse code for 1
+00A4   2???           00319                 call    short_wait
+00A5   2???           00320                 call    long
+00A6   2???           00321                 call    short_wait
+00A7   2???           00322                 call    long
+00A8   2???           00323                 call    short_wait
+00A9   2???           00324                 call    long
+00AA   2???           00325                 call    short_wait
+00AB   2???           00326                 call    long
+00AC   2???           00327                 call    long_wait
+                      00328                 
+                      00329 
+00AD   0008           00330                 return
+                      00331 
+00AE                  00332 _2
+00AE   2???           00333                 call    short   ;morse code for 2
+00AF   2???           00334                 call    short_wait
+00B0   2???           00335                 call    short
+00B1   2???           00336                 call    short_wait
+00B2   2???           00337                 call    long
+00B3   2???           00338                 call    short_wait
+00B4   2???           00339                 call    long
+00B5   2???           00340                 call    short_wait
+00B6   2???           00341                 call    long
+00B7   2???           00342                 call    long_wait
+                      00343 
+00B8   0008           00344                 return
+                      00345 
+00B9                  00346 _3
+00B9   2???           00347                 call    short   ;morse code for 3
+00BA   2???           00348                 call    short_wait
+00BB   2???           00349                 call    short
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  8
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00BC   2???           00350                 call    short_wait
+00BD   2???           00351                 call    short
+00BE   2???           00352                 call    short_wait
+00BF   2???           00353                 call    long
+00C0   2???           00354                 call    short_wait
+00C1   2???           00355                 call    long
+00C2   2???           00356                 call    long_wait
+                      00357 
+00C3   0008           00358                 return
+                      00359 
+00C4                  00360 _4
+00C4   2???           00361                 call    short   ;morse code for 4
+00C5   2???           00362                 call    short_wait
+00C6   2???           00363                 call    short
+00C7   2???           00364                 call    short_wait
+00C8   2???           00365                 call    short
+00C9   2???           00366                 call    short_wait
+00CA   2???           00367                 call    short
+00CB   2???           00368                 call    short_wait
+00CC   2???           00369                 call    long
+00CD   2???           00370                 call    long_wait
+                      00371 
+00CE   0008           00372                 return
+                      00373 
+00CF                  00374 _5
+00CF   2???           00375                 call    short   ;morse code for 5
+00D0   2???           00376                 call    short_wait
+00D1   2???           00377                 call    short
+00D2   2???           00378                 call    short_wait
+00D3   2???           00379                 call    short
+00D4   2???           00380                 call    short_wait
+00D5   2???           00381                 call    short
+00D6   2???           00382                 call    short_wait
+00D7   2???           00383                 call    short
+00D8   2???           00384                 call    long_wait
+                      00385 
+00D9   0008           00386                 return
+                      00387 
+00DA                  00388 _6
+00DA   2???           00389                 call    long    ;morse code for 6
+00DB   2???           00390                 call    short_wait
+00DC   2???           00391                 call    short
+00DD   2???           00392                 call    short_wait
+00DE   2???           00393                 call    short
+00DF   2???           00394                 call    short_wait
+00E0   2???           00395                 call    short
+00E1   2???           00396                 call    short_wait
+00E2   2???           00397                 call    short
+00E3   2???           00398                 call    long_wait
+                      00399 
+00E4   0008           00400                 return
+                      00401 
+00E5                  00402 short   ;short are for the dots
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE  9
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00403                 
+00E5   30C8           00404                 movlw   d'200'
+00E6   00A3           00405                 movwf   del3
+00E7                  00406 mcs
+00E7   1407           00407                 bsf             PORTC,0
+00E8   2???           00408                 call    delay500us2
+00E9   1007           00409                 bcf             PORTC,0
+00EA   2???           00410                 call    delay500us2
+                      00411 
+Message[305]: Using default destination of 1 (file).
+00EB   0BA3           00412                 decfsz  del3
+00EC   2???           00413                 goto    mcs
+                      00414 
+00ED   0008           00415                 return
+                      00416 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                            ;;
+                      00417                 
+00EE                  00418 long    ;long are for the bars
+                      00419                 
+00EE   3005           00420                 movlw   d'5'
+00EF   00A4           00421                 movwf   del4
+00F0                  00422 mcl
+00F0   2???           00423                 call    short
+Message[305]: Using default destination of 1 (file).
+00F1   0BA4           00424                 decfsz  del4
+00F2   2???           00425                 goto    mcl
+                      00426 
+00F3   0008           00427                 return
+                      00428 
+                      00429 
+00F4                  00430 wait1430ms                              ;delay1.43s
+                      00431 
+                      00432 
+00F4   308F           00433                 movlw   d'143'
+00F5   00A1           00434                 movwf   del1
+                      00435 
+00F6                  00436 wait1   
+00F6   300D           00437                 movlw   d'13'
+00F7   00A4           00438                 movwf   del4
+                      00439 
+00F8   1886           00440                 btfsc   PORTB,1
+00F9   2???           00441                 goto    start
+                      00442 
+                      00443 
+                      00444 
+00FA                  00445 wait1_2 
+00FA   30FF           00446                 movlw   d'255'
+00FB   00A3           00447                 movwf   del3
+                      00448 
+00FC                  00449 wait1_1 
+Message[305]: Using default destination of 1 (file).
+00FC   0BA3           00450                 decfsz  del3
+00FD   2???           00451                 goto    wait1_1
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 10
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00452 
+                      00453         
+Message[305]: Using default destination of 1 (file).
+00FE   0BA4           00454                 decfsz  del4
+00FF   2???           00455                 goto    wait1_2
+                      00456 
+Message[305]: Using default destination of 1 (file).
+0100   0BA1           00457                 decfsz  del1
+0101   2???           00458                 goto    wait1
+                      00459 
+0102   0008           00460                 return
+                      00461 
+                      00462 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00463 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00464 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00465 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00466 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; SWITCHES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00467 
+0103                  00468 switches
+0103   0808           00469                 movf    PORTD,W
+0104   00A7           00470                 movwf   key_input       ;the value of the portD is put in the key_input register
+                      00471 
+0105   2???           00472                 call    test_key        ;The result is printed on the 7 segments
+                      00473 
+0106   0008           00474                 return
+                      00475 
+0107                  00476 INIT_SWITCH
+                      00477         
+                      00478                 
+0107   1683           00479                 bsf     STATUS, RP0        ; enable page 1 register set
+                      00480         
+                      00481         
+0108   30FF           00482                 movlw   b'11111111'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0109   0088           00483                 movwf   TRISD   ;D set as input
+                      00484         
+010A   1283           00485                 bcf             STATUS,RP0
+                      00486         
+010B   2???           00487                 call    SET_SPI_REG
+                      00488         
+010C   0008           00489                 return
+                      00490 
+                      00491 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00492 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00493 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00494 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00495 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; DISPLAY ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00496         
+010D                  00497 bi2sep                                                                  ;input invariable is key_input 
+010D   0827           00498                 movfw   key_input
+010E   00AB           00499                 movwf   key     ;copy the key in an other register to save it
+010F   3007           00500                 movlw   b'00000111'     ;7 in base 10
+                      00501                 
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 11
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0110                  00502 flag3
+0110   02A7           00503                 subwf   key_input,1                                     ;f-w -> f
+0111   0AA8           00504                 incf    display1,1      ;first number
+                      00505                                                                 ;display0 units
+0112   1FA7           00506                 btfss   key_input,7     ;if key_input is overflow, skip the next instruction
+0113   2???           00507                 goto    flag3
+                      00508                 
+0114   03A8           00509                 decf    display1,1      ;There was an overflow, so here we decrement the first number
+0115   07A7           00510                 addwf   key_input,1     
+                      00511         
+0116   0827           00512                 movfw   key_input       ;The register contain now the unit number
+0117   00A9           00513                 movwf   display0
+                      00514                 
+0118   082B           00515                 movfw   key             ;The key is restore
+0119   00A7           00516                 movwf   key_input
+                      00517         
+011A   0008           00518                 return  
+                      00519         
+011B                  00520 show_number     
+011B   01A8           00521                 clrf    display1        ;clear the 2 numbers
+011C   01A9           00522                 clrf    display0
+                      00523 
+011D   2???           00524                 call    bi2sep  ;convert from base 2 to 7
+                      00525 
+011E   3001           00526                 movlw   b'0000001'
+011F   00A5           00527                 movwf   data_hi         ;settings of the max7219
+                      00528 
+0120   0829           00529                 movfw   display0
+0121   00A6           00530                 movwf   data_lo ;number we want to display
+                      00531 
+0122   2???           00532                 call    send_data       ;the datas are sent
+                      00533         
+0123   3002           00534                 movlw   b'00000010'
+0124   00A5           00535                 movwf   data_hi
+                      00536 
+0125   0828           00537                 movfw   display1        ;units
+0126   00A6           00538                 movwf   data_lo
+                      00539 
+0127   2???           00540                 call    send_data
+                      00541         
+0128   0008           00542                 return
+                      00543         
+0129                  00544 show_max        ;if the number we get is over than 66 or equal, we print 66
+                      00545         
+0129   3002           00546                 movlw   b'00000010'
+012A   00A5           00547                 movwf   data_hi
+                      00548 
+012B   3006           00549                 movlw   b'00000110'
+012C   00A6           00550                 movwf   data_lo
+                      00551 
+012D   2???           00552                 call    send_data
+                      00553                 
+012E   3001           00554                 movlw   b'00000001'
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 12
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+012F   00A5           00555                 movwf   data_hi
+                      00556 
+0130   3006           00557                 movlw   b'00000110'
+0131   00A6           00558                 movwf   data_lo
+                      00559 
+0132   2???           00560                 call    send_data
+0133   0008           00561                 return
+                      00562                 
+0134                  00563 test_key
+                      00564         
+0134   0827           00565                 movfw   key_input                       ;test whether the number input is over 66,key_in
+                            put - number
+0135   00AA           00566                 movwf   count_flag                      ;if it does, it will also display 66
+                      00567                                                         
+0136   3030           00568                 movlw   number
+Message[305]: Using default destination of 1 (file).
+0137   02AA           00569                 subwf   count_flag                      ;F-W->F
+                      00570         
+0138   1FAA           00571                 btfss   count_flag,7
+0139   2???           00572                 call    show_max
+                      00573         
+013A   1BAA           00574                 btfsc   count_flag,7
+013B   2???           00575                 call    show_number
+                      00576         
+013C   0008           00577                 return
+                      00578         
+                      00579         
+013D                  00580 SET_SPI_REG                                     ;;initial SPI
+                      00581         
+013D   3002           00582                 movlw    b'00000010'    
+013E   0094           00583                 movwf    SSPCON
+                      00584         
+013F   1683           00585                 bsf      STATUS, RP0        ; enable page 1 register set
+0140   1303           00586                 bcf              STATUS, RP1
+                      00587         
+0141   3040           00588                 movlw   b'01000000'             
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0142   0094           00589                 movwf   SSPSTAT
+                      00590         
+0143   3010           00591                 movlw   b'00010000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0144   0087           00592                 movwf   TRISC
+                      00593                 
+0145   3006           00594                 movlw   H'06'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0146   009F           00595                 movwf   ADCON1                          ;PORTA-5 will be digital output
+                      00596         
+                      00597                                                                         ;set RA5 to output as CS bit. ou
+                            tput
+0147   30DF           00598                 movlw   b'11011111'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0148   0085           00599                 movwf   TRISA
+                      00600         
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 13
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0149   1283           00601                 bcf     STATUS, RP0        ; back to page 0 register set
+014A   0187           00602                 clrf    PORTC
+014B   0193           00603                 clrf    SSPBUF                          ;
+                      00604         
+014C   3022           00605                 MOVLW   B'00100010'
+014D   0094           00606                 MOVWF   SSPCON
+                      00607         
+014E   0008           00608                 return
+                      00609                 
+014F                  00610 send_data                                               ;function. send 16 bits data
+                      00611         
+014F   1285           00612                 bcf             PORTA,5                         ;;enable maxism
+                      00613         
+0150   118C           00614                 bcf             PIR1,3                                  ;;clear interruption flag
+                      00615         
+0151   0825           00616                 movf     data_hi,W                      ;;send hi 8-bit data
+0152   0093           00617                 movwf    SSPBUF
+                      00618         
+0153                  00619 flag1
+0153   1D8C           00620                 btfss    PIR1,3                 ;waitting for transmitting
+0154   2???           00621                 goto     flag1
+                      00622         
+0155   118C           00623                 bcf             PIR1,3                  ;;after finished, clear interruption flag
+                      00624         
+0156   0826           00625                 movf     data_lo,W
+0157   0093           00626                 movwf    SSPBUF
+                      00627         
+0158                  00628 flag2
+                      00629         
+0158   1D8C           00630                 btfss    PIR1,3                 ;send low 8-bit data
+0159   2???           00631                 goto     flag2
+                      00632         
+015A   118C           00633                 bcf             PIR1,3                  ;;;important
+                      00634         
+015B   1685           00635                 bsf             PORTA,5                 ;;disable maxsim
+                      00636         
+015C   0008           00637                 return
+                      00638         
+015D                  00639 INIT_LCD
+                      00640                 
+015D   300C           00641                 movlw   b'00001100'                     ;0c
+015E   00A5           00642                 movwf   data_hi
+                      00643 
+015F   3000           00644                 movlw   b'00000000'                     ;00
+0160   00A6           00645                 movwf   data_lo
+                      00646 
+0161   2???           00647                 call    send_data
+                      00648         
+0162   0000           00649                 nop
+0163   0000           00650                 nop
+                      00651         
+0164   3009           00652                 movlw   b'00001001'                     ;09
+0165   00A5           00653                 movwf   data_hi
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 14
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00654 
+0166   30FF           00655                 movlw   b'11111111'                     ;ff
+0167   00A6           00656                 movwf   data_lo
+                      00657 
+0168   2???           00658                 call    send_data
+                      00659         
+0169   0000           00660                 nop
+016A   0000           00661                 nop
+                      00662         
+016B   300B           00663                 movlw   b'00001011'                     ;0b
+016C   00A5           00664                 movwf   data_hi
+                      00665 
+016D   3001           00666                 movlw   b'00000001'                     ;01
+016E   00A6           00667                 movwf   data_lo
+                      00668 
+016F   2???           00669                 call    send_data
+                      00670         
+0170   0000           00671                 nop
+0171   0000           00672                 nop
+                      00673         
+0172   300A           00674                 movlw   b'00001010'                     ;0a
+0173   00A5           00675                 movwf   data_hi
+                      00676 
+0174   300E           00677                 movlw   b'00001110'                     ;0e
+0175   00A6           00678                 movwf   data_lo
+                      00679 
+0176   2???           00680                 call    send_data
+                      00681         
+0177   0000           00682                 nop
+0178   0000           00683                 nop
+                      00684         
+0179   300C           00685                 movlw   b'00001100'                     ;0c
+017A   00A5           00686                 movwf   data_hi
+                      00687 
+017B   3001           00688                 movlw   b'00000001'                     ;01
+017C   00A6           00689                 movwf   data_lo
+                      00690 
+017D   2???           00691                 call    send_data
+                      00692 
+017E   3001           00693                 movlw   b'00000001'             ;add for display 00
+017F   00A5           00694                 movwf   data_hi
+                      00695 
+0180   3000           00696                 movlw   b'00000000'
+0181   00A6           00697                 movwf   data_lo
+                      00698 
+0182   2???           00699                 call    send_data
+                      00700 
+0183   3002           00701                 movlw   b'00000010'
+0184   00A5           00702                 movwf   data_hi
+                      00703 
+0185   3000           00704                 movlw   b'00000000'
+0186   00A6           00705                 movwf   data_lo
+                      00706 
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 15
+assignment_3
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0187   2???           00707                 call    send_data
+                      00708 
+0188   2???           00709                 call    wait1430ms
+                      00710         
+0189   0008           00711                 return
+                      00712 
+                      00713 
+                      00714 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;WAY;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+018A                  00715 _way    
+018A   1C2D           00716                 btfss   way,0   ;if the flag way is clear, we set it
+018B   2???           00717                 goto    reverse
+                      00718 
+018C   2???           00719                 goto    straight        ;else we clear it
+                      00720 
+018D                  00721 straight
+018D   1107           00722                 bcf             PORTC,2
+018E   102D           00723                 bcf             way,0
+018F   2???           00724                 goto    _wait
+                      00725 
+0190   1507           00726 reverse bsf             PORTC,2
+0191   142D           00727                 bsf             way,0
+0192   1906           00728 _wait   btfsc   PORTB,2
+0193   2???           00729                 goto    _wait
+                      00730 
+0194   0008           00731                 return
+                      00732                 
+                      00733 
+                      00734 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00735 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00736 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00737 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00738 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;MAIN FUNCTION;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                      00739 
+0195                  00740 start   
+0195   2???           00741                 call    init
+0196                  00742 next    
+0196   2???           00743                 call    switches
+                      00744 
+0197   1886           00745                 btfsc   PORTB,1 ;RESET
+0198   2???           00746                 goto    start
+                      00747 
+0199   1906           00748                 btfsc   PORTB,2 ;Set the way
+019A   2???           00749                 call    _way
+                      00750 
+019B   1C30           00751                 btfss   start_stop,0    ;if the start/stop flag is set, the count will begin
+019C   2???           00752                 goto    next    ;else we come back to the switches function
+                      00753 
+019D   1030           00754                 bcf             start_stop,0
+019E   2???           00755                 call    go
+019F   2???           00756                 goto    start
+3F32                  00757                 end
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 16
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCS0                             00000006
+ADCS1                             00000007
+ADCS2                             00000006
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+CCP2X                             00000005
+CCP2Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CIS                               00000003
+CKE                               00000006
+CKP                               00000004
+CM0                               00000000
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 17
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000009C
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+CVR0                              00000000
+CVR1                              00000001
+CVR2                              00000002
+CVR3                              00000003
+CVRCON                            0000009D
+CVREN                             00000007
+CVROE                             00000006
+CVRR                              00000005
+D                                 00000005
+DATA_ADDRESS                      00000005
+DC                                00000001
+D_A                               00000005
+EEADR                             0000010D
+EEADRH                            0000010F
+EECON1                            0000018C
+EECON2                            0000018D
+EEDATA                            0000010C
+EEDATH                            0000010E
+EEIE                              00000004
+EEIF                              00000004
+EEPGD                             00000007
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INIT_LCD                          0000015D
+INIT_SWITCH                       00000107
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IRP                               00000007
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 18
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+NOT_WRITE                         00000002
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+P                                 00000004
+PCFG0                             00000000
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PEN                               00000002
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+R                                 00000002
+RBIE                              00000003
+RBIF                              00000000
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+READ_WRITE                        00000002
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 19
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_W                               00000002
+S                                 00000003
+SEN                               00000000
+SET_SPI_REG                       0000013D
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPOV                             00000006
+SSPSTAT                           00000094
+STATUS                            00000003
+SYNC                              00000004
+S_save                            00000032
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 20
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRISC                             00000087
+TRISD                             00000088
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRMT                              00000001
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+UA                                00000001
+W                                 00000000
+WCOL                              00000007
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+W_save                            00000031
+Z                                 00000002
+_1                                000000A3
+_2                                000000AE
+_3                                000000B9
+_4                                000000C4
+_5                                000000CF
+_6                                000000DA
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CPD_OFF                          00003FFF
+_CPD_ON                           00003EFF
+_CP_ALL                           00001FFF
+_CP_OFF                           00003FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_HS_OSC                           00003FFE
+_LP_OSC                           00003FFC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC                           00003FFF
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 21
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_WRT_1FOURTH                      00003BFF
+_WRT_256                          00003DFF
+_WRT_HALF                         000039FF
+_WRT_OFF                          00003FFF
+_XT_OSC                           00003FFD
+__16F877A                         00000001
+__DEBUG                           1
+_reg                              00000085
+_stop                             00000033
+_wait                             00000192
+_way                              0000018A
+alarm                             0000005A
+bi2sep                            0000010D
+count_flag                        0000002A
+data_hi                           00000025
+data_lo                           00000026
+del1                              00000021
+del2                              00000022
+del3                              00000023
+del4                              00000024
+delay1                            00000057
+delay1_2                          0000006C
+delay2                            0000005F
+delay500us                        00000055
+delay500us2                       0000006A
+display0                          00000029
+display1                          00000028
+flag1                             00000153
+flag2                             00000158
+flag3                             00000110
+go                                00000032
+go1_1                             00000044
+go1_2                             00000049
+go2                               00000036
+go2_1                             00000039
+go2_2                             0000003E
+init                              00000005
+int_routine                       0000001F
+key                               0000002B
+key_input                         00000027
+long                              000000EE
+long_wait                         0000007F
+max                               0000002F
+mcl                               000000F0
+mcl2                              00000081
+mcs                               000000E7
+mcs2                              00000078
+morse                             0000006F
+next                              00000196
+number                            00000030
+reg                               0000002C
+MPASM  5.37                      UNTITLED.ASM   12-6-2013  16:40:30         PAGE 22
+assignment_3
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+reverse                           00000190
+send_data                         0000014F
+short                             000000E5
+short_wait                        00000076
+show_max                          00000129
+show_number                       0000011B
+start                             00000195
+start_stop                        00000030
+stop                              0000004E
+stop2                             0000004F
+straight                          0000018D
+switches                          00000103
+t0                                00000088
+t1                                0000008B
+t3                                0000008E
+t4                                00000091
+t5                                00000094
+test_key                          00000134
+wait1                             000000F6
+wait1430ms                        000000F4
+wait1_1                           000000FC
+wait1_2                           000000FA
+way                               0000002D
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :    27 reported,     0 suppressed
+
+
